@@ -9,6 +9,7 @@ let userActionsList = undefined;
 let mouseMovementLimiter = 5;
 let maxActionsHistoryLimit = 250;
 let surfSystemReady = false
+let userIpAddress = "";
 
 // List of user events to track
 const userEventsToTrack = [
@@ -85,6 +86,50 @@ async function fetchBehaviourDefinitions() {
   }
 }
 
+function getBrowserType() {
+  const userAgent = navigator.userAgent;
+  if (userAgent.indexOf("Firefox") > -1) {
+    return "Mozilla Firefox";
+  } else if (userAgent.indexOf("Chrome") > -1) {
+    return "Google Chrome";
+  } else if (userAgent.indexOf("Trident") > -1) {
+    return "Microsoft Internet Explorer";
+  } else if (userAgent.indexOf("Edge") > -1) {
+    return "Microsoft Edge";
+  } else if (userAgent.indexOf("Safari") > -1) {
+    return "Apple Safari";
+  } else {
+    return "unknown";
+  }
+}
+
+function getBrowserVersion() {
+  const userAgent = navigator.userAgent;
+  let version = "";
+  if (userAgent.indexOf("Firefox") > -1) {
+    version = userAgent.match(/Firefox\/\d+/)[0].split("/")[1];
+  } else if (userAgent.indexOf("Chrome") > -1) {
+    version = userAgent.match(/Chrome\/\d+/)[0].split("/")[1];
+  } else if (userAgent.indexOf("Trident") > -1) {
+    version = userAgent.match(/rv:\d+/)[0].split(":")[1];
+  } else if (userAgent.indexOf("Edge") > -1) {
+    version = userAgent.match(/Edge\/\d+/)[0].split("/")[1];
+  } else if (userAgent.indexOf("Safari") > -1) {
+    version = userAgent.match(/Version\/\d+/)[0].split("/")[1];
+  }
+  return version;
+}
+
+async function getUserIpAddress() {
+  try {
+    const response = await fetch("https://api.ipify.org?format=json");
+    const data = await response.json();
+    userIpAddress = data.ip;
+  } catch (error) {
+    console.error(error);
+  }
+}
+
 // Fetch the behaviour definitions at the beginning
 function readActionHistory() {
   const savedData = JSON.parse(localStorage.getItem('historicUserActions'));
@@ -97,19 +142,56 @@ function readActionHistory() {
   }
 }
 
-function check_for_matching(behaviour, userActionsList, parentKey = '') {
-  const childrenArray = Object.entries(behaviour).map(([key, value]) => key);
+function sendToBackend(logEntry) {
+  let methodURL = serverURL + '/add-userlog';
 
-  for (const [key, value] of Object.entries(behaviour)) {
+  console.log(methodURL);
+
+  fetch(methodURL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(logEntry)
+  })
+    .then(response => response.json())
+    .then(data => {
+      console.log('Record inserted successfully:', data);
+    })
+    .catch(error => {
+      console.error('Error inserting record:', error);
+    });
+
+}
+
+function check_for_matching(behaviourDef, behaviourJSON, userActionsList, parentKey = '') {
+  const childrenArray = Object.entries(behaviourJSON).map(([key, value]) => key);
+
+  for (const [key, value] of Object.entries(behaviourJSON)) {
     const newKey = parentKey ? `${parentKey}.${key}` : key;
     if (typeof value === 'object') {
-      check_for_matching(value, userActionsList, newKey);
+      check_for_matching(behaviourDef, value, userActionsList, newKey);
     } else {
-      const foundMatch = false;
+      let foundMatch = false;
       //console.log(`   Element key: ${newKey}, value: ${value}`);
+
+      if (Math.random() < 0.1) {
+        foundMatch = true;
+        // test test test
+      }
 
       if (foundMatch) {
         console.log(`Match found for key: ${newKey}, value: ${value}`);
+
+        let logEntry = {
+          definition_name: behaviourDef.definition_name,
+          user_ip: userIpAddress,
+          browser_type: getBrowserType() + '/' + getBrowserVersion(),
+          current_url: window.location.href
+        };
+
+        sendToBackend(logEntry);
+
       }
     }
   }
@@ -126,7 +208,7 @@ function process_event(event) {
 
       let behaviour = bh.json_definition;
       //console.log('Checking for: ' + bh.definition_name);
-      check_for_matching(behaviour, userActionsList);
+      check_for_matching(bh, behaviour, userActionsList);
     }
   }
 }
@@ -139,6 +221,8 @@ function onDOMLoaded() {
   fetchBehaviourDefinitions();
 
   readActionHistory();
+
+  getUserIpAddress();
 
   surfSystemReady = true;
 }
@@ -340,14 +424,11 @@ function sendMessageToInjectedScript(eventName, data) {
   // Create a custom bottom div for logging
   const customBottomDiv = document.createElement("div");
   customBottomDiv.setAttribute("id", "customBottomDiv");
-  customBottomDiv.style.cssText = "position: fixed; bottom: 0; left: 0; width: 100%; background-color: #51da4c; padding: 8px; z-index: 9999; display: none";
+  customBottomDiv.style.cssText = "position: fixed; bottom: 0; left: 0; width: 100%; background-color: #51da4c; padding: 2px; z-index: 9999; display: none; color: black; font-size: 8pt;";
   customBottomDiv.innerText = "Surf-Maven log: ";
   document.body.appendChild(customBottomDiv);
 
   // Add event listeners for updating and toggling the custom bottom div
-  document.addEventListener("messageFromContent", (event) => {
-    // ... (omitted for brevity)
-  });
 
   document.addEventListener("messageFromContent", (event) => {
     customBottomDiv.innerText = event.detail;

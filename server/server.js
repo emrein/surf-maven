@@ -1,7 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const { Behaviour } = require('./database');
+const { Behaviour, UserLog } = require('./database');
 const sqlite3 = require('sqlite3').verbose();
 
 const app = express();
@@ -111,4 +111,25 @@ app.listen(port, () => {
 
   console.log("Server started at port" + port.toString());
 
+});
+
+
+// Create a new behaviour
+app.post('/add-userlog', (req, res) => {
+  log_start('add-userlog');
+  console.log(req.body);
+
+  let logEntry = req.body;
+
+  console.log(logEntry);
+  UserLog.create({
+    definition_name: logEntry.definition_name,
+    user_ip: logEntry.user_ip,
+    browser_type: logEntry.browser_type,
+    current_url: logEntry.current_url,
+    creation_date: new Date(),
+  })
+    .then(() => res.json({ success: true }))
+    .catch(error => res.status(500).json({ error: error.message }));
+  log_end('add-userlog');
 });

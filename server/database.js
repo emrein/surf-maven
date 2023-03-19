@@ -40,11 +40,41 @@ const Behaviour = sequelize.define('behaviour', {
   }
 });
 
+// Define the "userLog" table
+const UserLog = sequelize.define('userlog', {
+  id: {
+    type: Sequelize.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  definition_name: {
+    type: Sequelize.STRING,
+    allowNull: false
+  },
+  user_ip: {
+    type: Sequelize.STRING,
+    allowNull: true
+  },
+  browser_type: {
+    type: Sequelize.STRING,
+    allowNull: true
+  },
+  current_url: {
+    type: Sequelize.STRING,
+    allowNull: true
+  },
+  creation_date: {
+    type: Sequelize.DATE,
+    allowNull: false
+  }
+});
+
 sequelize.sync()
   .then(() => {
-    console.log('Database synced');
+    console.log('Database synced.');
   });
 
 module.exports = {
-  Behaviour
+  Behaviour,
+  UserLog
 };
