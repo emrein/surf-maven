@@ -14,30 +14,19 @@ let userIpAddress = "";
 // List of user events to track
 const userEventsToTrack = [
   "click",
-  //"mousemove",
   "scroll",
   "keypress",
-  //"keydown",
   "pageshow",
   "pagehide",
-  "mouseup",
-  "mousedown",
-  "mouseover",
-  "mouseout",
   "mouseenter",
   "mouseleave",
-  "focus",
-  //"blur",
-  "touchstart",
-  //"touchmove",
-  "touchend",
   "beforeunload",
   "popstate"];
 
 // Helper function to format the event details for logging
 function formatEventDetails(event) {
   let eventDetails = `${event.counter} | ${new Date(event.preciseTime).toLocaleString()} | ${event.url} | ${event.type} | `;
-  if (["click", "mouseup", "mousedown", "mouseover", "mouseout", "mouseenter", "mouseleave", "focus", "blur"].includes(event.type)) {
+  if (["click", "mouseenter", "mouseleave"].includes(event.type)) {
     eventDetails += `Target: ${event.target} | `;
   } else if (["keypress", "keydown"].includes(event.type)) {
     eventDetails += `Key: ${event.key} | `;
@@ -86,36 +75,11 @@ async function fetchBehaviourDefinitions() {
   }
 }
 
-function getBrowserType() {
-  const userAgent = navigator.userAgent;
-  if (userAgent.indexOf("Firefox") > -1) {
-    return "Mozilla Firefox";
-  } else if (userAgent.indexOf("Chrome") > -1) {
-    return "Google Chrome";
-  } else if (userAgent.indexOf("Trident") > -1) {
-    return "Microsoft Internet Explorer";
-  } else if (userAgent.indexOf("Edge") > -1) {
-    return "Microsoft Edge";
-  } else if (userAgent.indexOf("Safari") > -1) {
-    return "Apple Safari";
-  } else {
-    return "unknown";
-  }
-}
-
 function getBrowserVersion() {
   const userAgent = navigator.userAgent;
   let version = "";
-  if (userAgent.indexOf("Firefox") > -1) {
-    version = userAgent.match(/Firefox\/\d+/)[0].split("/")[1];
-  } else if (userAgent.indexOf("Chrome") > -1) {
+  if (userAgent.indexOf("Chrome") > -1) {
     version = userAgent.match(/Chrome\/\d+/)[0].split("/")[1];
-  } else if (userAgent.indexOf("Trident") > -1) {
-    version = userAgent.match(/rv:\d+/)[0].split(":")[1];
-  } else if (userAgent.indexOf("Edge") > -1) {
-    version = userAgent.match(/Edge\/\d+/)[0].split("/")[1];
-  } else if (userAgent.indexOf("Safari") > -1) {
-    version = userAgent.match(/Version\/\d+/)[0].split("/")[1];
   }
   return version;
 }
@@ -145,7 +109,7 @@ function readActionHistory() {
 function sendToBackend(logEntry) {
   let methodURL = serverURL + '/add-userlog';
 
-  console.log(methodURL);
+  //console.log(methodURL);
 
   fetch(methodURL, {
     method: 'POST',
@@ -156,7 +120,7 @@ function sendToBackend(logEntry) {
   })
     .then(response => response.json())
     .then(data => {
-      console.log('Record inserted successfully:', data);
+      // console.log('Record inserted successfully:', data);
     })
     .catch(error => {
       console.error('Error inserting record:', error);
@@ -181,12 +145,12 @@ function check_for_matching(behaviourDef, behaviourJSON, userActionsList, parent
       }
 
       if (foundMatch) {
-        console.log(`Match found for key: ${newKey}, value: ${value}`);
+        //console.log(`Match found for key: ${newKey}, value: ${value}`);
 
         let logEntry = {
           definition_name: behaviourDef.definition_name,
           user_ip: userIpAddress,
-          browser_type: getBrowserType() + '/' + getBrowserVersion(),
+          browser_type: 'Chrome' + '/' + getBrowserVersion(),
           current_url: window.location.href
         };
 
@@ -315,30 +279,14 @@ function sendMessageToInjectedScript(eventName, data) {
 
     switch (eventType) {
       case "click":
-      case "mouseup":
-      case "mousedown":
-      case "mouseover":
-      case "mouseout":
       case "mouseenter":
       case "mouseleave":
-      case "focus":
-      case "blur":
-        // Only proceed with mouseover and mouseout events if the target element has changed
-        if ((eventType === "mouseover" || eventType === "mouseout") && event.target === lastMouseOverTarget) {
-          return;
-        }
 
-        if (eventType === "mouseover" || eventType === "mouseout") {
-          lastMouseOverTarget = event.target;
-        }
+      console.log("TYPE:", eventType);
+
         eventData.target = event.target;
-
-        // Add the 'id' field if the target element has an 'id' attribute
-        if (event.target.id) {
-          eventData.id = event.target.id;
-        }
         break;
-      //case "keydown":
+
       case "keypress":
         eventData.key = event.key;
         break;
@@ -395,6 +343,8 @@ function sendMessageToInjectedScript(eventName, data) {
         lastScrollTop = window.scrollY;
         lastScrollLeft = window.scrollX;
 
+        eventData.viewportHeight = viewportHeight;
+        eventData.documentHeight = documentHeight;
         eventData.scrollTop = window.scrollY;
         eventData.scrollLeft = window.scrollX;
         eventData.scrollDirection = scrollDirection;
