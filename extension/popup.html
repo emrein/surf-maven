@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 10;
+            padding: 10;
+            width: 250px;
+            overflow: hidden;
+            background-color: dodgerblue;
+        }
+
+        img {
+            width: 128px;
+            height: 128px;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        button {
+            font-size: 18px;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background-color: #f8f8f8;
+            border-color: #999;
+        }
+
+        button:active {
+            background-color: #f0f0f0;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) inset;
+        }
+
+        p.access-code-description {
+            font-size: 12px;
+            font-style: italic;
+            margin-top: 5px;
+            margin-bottom: 15px;
+        }
+    </style>
+    <title>Popup</title>
+</head>
+<body>
+    <img src="images/icon128.png" alt="Icon">
+    <h1>Surf-Maven Agent</h1>
+    <h2>Please click start to start the Surf-Maven Extension</h2>
+    <form id="accessCodeForm">
+        <input type="text" id="accessCode" name="accessCode" />
+        <p class="access-code-description">Please enter the code if it's provided by the researcher...</p>
+        <label for="developerMode">Developer Mode</label>
+        <input type="checkbox" id="developerMode" name="developerMode" />
+    </form>
+    <script src="popup.js"></script>
+
+    <div id="message" style="color: rgb(97, 2, 2);"></div>
+</body>
+</html>
