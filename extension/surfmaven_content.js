@@ -7,7 +7,7 @@ let globalBehaviours = undefined;
 let pageEventCount = 0;
 let userActionsList = undefined;
 let mouseMovementLimiter = 5;
-let maxActionsHistoryLimit = 250;
+let maxActionsHistoryLimit = 50;
 let surfSystemReady = false
 let userIpAddress = "";
 
@@ -21,6 +21,8 @@ const userEventsToTrack = [
   "mouseenter",
   "mouseleave",
   "beforeunload",
+  "chromeLostFocus",
+  "chromeGainedFocus",
   "popstate"];
 
 // Helper function to format the event details for logging
@@ -66,6 +68,8 @@ async function fetchBehaviourDefinitions() {
         jsonObj = null;
       }
       bh.json_definition = jsonObj
+      bh.behavioursAsList = convertBehaviourJSONToList(jsonObj);
+      console.log(bh.definition_name + " as List: ", bh.behavioursAsList);
     }
 
     globalBehaviours = data; // Assign the fetched data to the global object
@@ -75,7 +79,63 @@ async function fetchBehaviourDefinitions() {
   }
 }
 
-function getBrowserVersion() {
+function getNodes(object) {
+  return Object
+    .entries(object)
+    .map(([key, value]) => value && typeof value === 'object'
+      ? { title: key, key, children: getNodes(value) }
+      : { title: key, key, value }
+    );
+}
+
+function convertBehaviourJSONToList(obj) {
+  let list = [];
+
+  if (typeof obj !== 'object' || obj === null) {
+    return;
+  }
+
+  let current_node = new Map();
+  for (const [key, value] of Object.entries(obj)) {
+    if (!(key == 'children')) {
+      {
+        //console.log(`${key}:`, value);
+        current_node.set(key, value);
+      }
+    }
+  }
+
+  if (current_node.get('type') != 'for') {
+    list.push(current_node);
+  }
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (key == 'children') {
+      let subListFromArray = [];
+
+      let for_loop_count = 1;
+      if (current_node.get('type') == 'for') {
+        for_loop_count = current_node.get('for_count');
+      }
+      for (let i = 0; i < value.length; i++) {
+        let subList = convertBehaviourJSONToList(value[i]);
+        for (let s = 0; s < subList.length; s++)
+          subListFromArray.push(subList[s]);
+      }
+
+      if (subListFromArray) { // append subListFromArray to list
+        for (let r = 0; r < for_loop_count; r++) {
+          for (let s = 0; s < subListFromArray.length; s++)
+            list.push(subListFromArray[s]);
+        }
+      }
+
+    }
+  }
+  return list;
+}
+
+function getBcurrent_nodeserVersion() {
   const userAgent = navigator.userAgent;
   let version = "";
   if (userAgent.indexOf("Chrome") > -1) {
@@ -102,14 +162,17 @@ function readActionHistory() {
     if (userActionsList == undefined || userActionsList == null) {
       userActionsList = [];
     }
-    //console.log('READ:', userActionsList.slice(0, 10));
+
+    for (let i = 0; i < userActionsList.length; i++)
+      if (userActionsList[i].counter > pageEventCount)
+        pageEventCount = userActionsList[i].counter;
+
+    console.log('READ:', userActionsList.slice(0, 50));
   }
 }
 
-function sendToBackend(logEntry) {
+function sendToServerUserLog(logEntry) {
   let methodURL = serverURL + '/add-userlog';
-
-  //console.log(methodURL);
 
   fetch(methodURL, {
     method: 'POST',
@@ -120,7 +183,6 @@ function sendToBackend(logEntry) {
   })
     .then(response => response.json())
     .then(data => {
-      // console.log('Record inserted successfully:', data);
     })
     .catch(error => {
       console.error('Error inserting record:', error);
@@ -128,51 +190,65 @@ function sendToBackend(logEntry) {
 
 }
 
-function check_for_matching(behaviourDef, behaviourJSON, userActionsList, parentKey = '') {
-  const childrenArray = Object.entries(behaviourJSON).map(([key, value]) => key);
+function checkMatchingForBehaviour(bhDef, userActionsList) {
 
-  for (const [key, value] of Object.entries(behaviourJSON)) {
-    const newKey = parentKey ? `${parentKey}.${key}` : key;
-    if (typeof value === 'object') {
-      check_for_matching(behaviourDef, value, userActionsList, newKey);
-    } else {
-      let foundMatch = false;
-      //console.log(`   Element key: ${newKey}, value: ${value}`);
+  let foundMatch = false;
 
-      if (Math.random() < 0.1) {
-        foundMatch = true;
-        // test test test
-      }
-
-      if (foundMatch) {
-        //console.log(`Match found for key: ${newKey}, value: ${value}`);
-
-        let logEntry = {
-          definition_name: behaviourDef.definition_name,
-          user_ip: userIpAddress,
-          browser_type: 'Chrome' + '/' + getBrowserVersion(),
-          current_url: window.location.href
-        };
-
-        sendToBackend(logEntry);
-
-      }
-    }
+  let firstBhBlock = undefined;
+  let firstStepOffset = 0;
+  if (bhDef.behavioursAsList.length > 0) {
+    let step = bhDef.behavioursAsList[0];
+    if (step['type'] == 'behaviour')
+      firstBhBlock = step;
+    firstStepOffset = +1;
   }
+
+  let stepsCount = firstBhBlock == undefined ? bhDef.behavioursAsList.length : bhDef.behavioursAsList.length - 1;
+  let loopLength = Math.min(stepsCount, userActionsList.length);
+
+  console.log(">>> CHECK FOR BEHAVIOUR ", bhDef.definition_name);
+
+  let cnt = 0;
+  for (let index = 0; index < loopLength; index++) {
+    let step = bhDef.behavioursAsList[bhDef.behavioursAsList.length - index - 1];
+    let action = userActionsList[userActionsList.length - index - 1];
+    cnt++;
+    console.log("Step ", cnt, ":", step);
+    console.log("UserAction ", cnt, ":", action);
+
+    // do comparing .......
+
+  }
+  console.log(">>> END OF BEHAVIOUR ", bhDef.definition_name);
+
+  if (Math.random() < 0.1) {
+    foundMatch = true;
+
+  }
+
+  if (foundMatch) {
+
+    let logEntry = {
+      definition_name: bhDef.definition_name,
+      user_ip: userIpAddress,
+      bcurrent_nodeser_type: 'Chrome' + '/' + getBcurrent_nodeserVersion(),
+      current_url: window.location.href
+    };
+
+    sendToServerUserLog(logEntry);
+  }
+
 }
 
 function process_event(event) {
   if (userActionsList == undefined || globalBehaviours == undefined)
     return;
 
-  console.log('processing the event #', pageEventCount);
   if (globalBehaviours) {
     for (let bhKey in globalBehaviours) {
-      let bh = globalBehaviours[bhKey];
+      let bhDef = globalBehaviours[bhKey];
 
-      let behaviour = bh.json_definition;
-      //console.log('Checking for: ' + bh.definition_name);
-      check_for_matching(bh, behaviour, userActionsList);
+      checkMatchingForBehaviour(bhDef, userActionsList);
     }
   }
 }
@@ -203,6 +279,15 @@ chrome.storage.local.get("surf_maven_developer_mode", (data) => {
   sendMessageToInjectedScript("toggleDivsVisibility", developerMode);
 });
 
+function saveUserActions() {
+  const dataToSave = {
+    userActions: userActionsList,
+    // Add any other data you want to save
+  };
+
+  localStorage.setItem('historicUserActions', JSON.stringify(dataToSave));
+}
+
 // Listen for userActivity events
 document.addEventListener("userActivity", (event) => {
 
@@ -218,11 +303,15 @@ document.addEventListener("userActivity", (event) => {
   if (userActionsList === undefined)
     userActionsList = [];
 
-  userActionsList.push(event.detail);
+  if (!event.detail.skipEvent) {
+    userActionsList.push(event.detail);
 
-  if (userActionsList.length > maxActionsHistoryLimit) {
-    const itemsToRemove = userActionsList.length - maxActionsHistoryLimit;
-    userActionsList.splice(0, itemsToRemove);
+    if (userActionsList.length > maxActionsHistoryLimit) {
+      const itemsToRemove = userActionsList.length - maxActionsHistoryLimit;
+      userActionsList.splice(0, itemsToRemove);
+    }
+
+    saveUserActions();
   }
   process_event(event.detail);
 });
@@ -270,19 +359,20 @@ function sendMessageToInjectedScript(eventName, data) {
   function handleEvent(eventType, event) {
     pageEventCount++;
 
+    let time = Date.now(); // Add precise timestamp
     let eventData = {
       counter: pageEventCount,
       type: event.type,
       url: window.location.href,
-      preciseTime: Date.now(), // Add precise timestamp
+      preciseTime: time,
+      preciseTimeStr: new Date(time).toLocaleString(), // For debug only
+      skipEvent: false
     };
 
     switch (eventType) {
       case "click":
       case "mouseenter":
       case "mouseleave":
-
-      console.log("TYPE:", eventType);
 
         eventData.target = event.target;
         break;
@@ -355,10 +445,29 @@ function sendMessageToInjectedScript(eventName, data) {
       case "navigation":
         eventData.navigationType = event.type;
         break;
+
+      case "chromeLostFocus":
+        eventData.focusState = "lost";
+        break;
+
+      case "chromeGainedFocus":
+        eventData.focusState = "gained";
+        break;
+      default: eventData.skipEvent = true
     }
 
     sendUserActivity(eventData);
   }
+
+  // Add event listener for when Chrome loses focus
+  window.addEventListener("blur", function (event) {
+    handleEvent("chromeLostFocus", event);
+  });
+
+  // Add event listener for when Chrome gains focus
+  window.addEventListener("focus", function (event) {
+    handleEvent("chromeGainedFocus", event);
+  });
 
   // Add event listeners for the user events
   userEventsToTrack.forEach((eventType) => {
@@ -390,12 +499,8 @@ function sendMessageToInjectedScript(eventName, data) {
   });
 
   window.addEventListener('beforeunload', (event) => {
-    const dataToSave = {
-      userActions: userActionsList,
-      // Add any other data you want to save
-    };
 
-    localStorage.setItem('historicUserActions', JSON.stringify(dataToSave));
+    saveUserActions
     //console.log('WRITE:', userActionsList.slice(0, 10));
   });
 
