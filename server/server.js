@@ -64,7 +64,7 @@ app.put('/behaviours/:id', (req, res) => {
 
 // Delete a behaviour by ID
 app.post('/delete-behaviour/:id', (req, res) => {
-  log_start('delete-behaviour'+req.params.id);
+  log_start('delete-behaviour' + req.params.id);
   Behaviour.destroy({ where: { id: req.params.id } })
     .then(() => res.json({ success: true }))
     .catch(error => res.status(500).json({ error: error.message }));
@@ -132,4 +132,18 @@ app.post('/add-userlog', (req, res) => {
     .then(() => res.json({ success: true }))
     .catch(error => res.status(500).json({ error: error.message }));
   log_end('add-userlog');
+}
+);
+
+app.get("/userlog-last10", (req, res) => {
+  log_start('userlog-last10');
+  db.all("SELECT * FROM userlogs ORDER BY creation_date desc;", (err, rows) => {
+    if (err) {
+      console.error(err.message);
+    }
+    res.json(JSON.stringify(rows));
+    log_end('userlog-last10');
+  });
+
 });
+

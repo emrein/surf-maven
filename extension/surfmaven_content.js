@@ -13,6 +13,7 @@ let userIpAddress = "";
 
 // List of user events to track
 const userEventsToTrack = [
+  "load",
   "click",
   "scroll",
   "keypress",
@@ -28,17 +29,11 @@ const userEventsToTrack = [
 // Helper function to format the event details for logging
 function formatEventDetails(event) {
   let eventDetails = `${event.counter} | ${new Date(event.preciseTime).toLocaleString()} | ${event.url} | ${event.type} | `;
-  if (["click", "mouseenter", "mouseleave"].includes(event.type)) {
+  if (["navigation", "click"].includes(event.type)) {
     eventDetails += `Target: ${event.target} | `;
-  } else if (["keypress", "keydown"].includes(event.type)) {
-    eventDetails += `Key: ${event.key} | `;
-  } else if (["mousemove", "touchmove"].includes(event.type)) {
-    eventDetails += `X: ${event.x} | Y: ${event.y} | `;
-  } else if (["touchstart", "touchend"].includes(event.type)) {
-    eventDetails += `Touches: | ${event.touches.map(touch => `ID: ${touch.identifier}, X: ${touch.x}, Y: ${touch.y}`).join(" | ")} | `;
   } else if (["scroll"].includes(event.type)) {
     eventDetails += `Scroll speed: ${event.scrollSpeed} | direction: ${event.scrollDirection} | position: ${event.scrollPosition} | `;
-  } else if (["pageshow", "pagehide", "navigation"].includes(event.type)) {
+  } else if (["navigation"].includes(event.type)) {
     eventDetails += `Page visibility state: ${document.visibilityState} | `;
   } else {
     eventDetails += "No additional details available. | " + JSON.stringify(event);
@@ -69,7 +64,7 @@ async function fetchBehaviourDefinitions() {
       }
       bh.json_definition = jsonObj
       bh.behavioursAsList = convertBehaviourJSONToList(jsonObj);
-      console.log(bh.definition_name + " as List: ", bh.behavioursAsList);
+      //console.log(bh.definition_name + " as List: ", bh.behavioursAsList);
     }
 
     globalBehaviours = data; // Assign the fetched data to the global object
@@ -167,7 +162,7 @@ function readActionHistory() {
       if (userActionsList[i].counter > pageEventCount)
         pageEventCount = userActionsList[i].counter;
 
-    console.log('READ:', userActionsList.slice(0, 50));
+    //console.log('Last 10 user actions here: ', userActionsList); //.slice(Math.max(0, userActionsList.length-11), 10));
   }
 }
 
@@ -191,6 +186,8 @@ function sendToServerUserLog(logEntry) {
 }
 
 function checkMatchingForBehaviour(bhDef, userActionsList) {
+
+  return;
 
   let foundMatch = false;
 
@@ -284,7 +281,6 @@ function saveUserActions() {
     userActions: userActionsList,
     // Add any other data you want to save
   };
-
   localStorage.setItem('historicUserActions', JSON.stringify(dataToSave));
 }
 
@@ -311,9 +307,9 @@ document.addEventListener("userActivity", (event) => {
       userActionsList.splice(0, itemsToRemove);
     }
 
-    saveUserActions();
+    process_event(event.detail);
   }
-  process_event(event.detail);
+
 });
 
 // Sets the visibility of custom bottom div
@@ -345,19 +341,20 @@ function sendMessageToInjectedScript(eventName, data) {
 
 // Main function that initializes the content script
 (function () {
+
   function sendUserActivity(data) {
     const event = new CustomEvent("userActivity", { detail: data });
     document.dispatchEvent(event);
   }
 
+/* NEW or UPDATED BEGINS *********************************/
+
   let lastScrollTop = window.scrollY;
   let lastScrollLeft = window.scrollX;
-  let lastMouseOverTarget = null;
   let lastScrollTime = Date.now();
 
   // Function to handle user events
   function handleEvent(eventType, event) {
-    pageEventCount++;
 
     let time = Date.now(); // Add precise timestamp
     let eventData = {
@@ -370,24 +367,13 @@ function sendMessageToInjectedScript(eventName, data) {
     };
 
     switch (eventType) {
-      case "click":
-      case "mouseenter":
-      case "mouseleave":
-
+      case "load":
         eventData.target = event.target;
+        eventData.type = "navigation";
         break;
 
-      case "keypress":
-        eventData.key = event.key;
-        break;
-
-      case "touchstart":
-      case "touchend":
-        eventData.touches = Array.from(event.changedTouches).map((touch) => ({
-          identifier: touch.identifier,
-          x: touch.clientX,
-          y: touch.clientY,
-        }));
+      case "click":
+        eventData.target = event.target;
         break;
 
       case "scroll":
@@ -446,39 +432,37 @@ function sendMessageToInjectedScript(eventName, data) {
         eventData.navigationType = event.type;
         break;
 
-      case "chromeLostFocus":
-        eventData.focusState = "lost";
-        break;
-
-      case "chromeGainedFocus":
-        eventData.focusState = "gained";
-        break;
       default: eventData.skipEvent = true
     }
 
-    sendUserActivity(eventData);
+    if (!eventData.skipEvent) {
+      pageEventCount++;
+
+      sendUserActivity(eventData);
+    }
   }
+
+  // Add event listeners for the user events
+  userEventsToTrack.forEach((eventType) => {
+    window.addEventListener(eventType, (event) => handleEvent(eventType, event));
+  });
+
+  window.addEventListener('beforeunload', (event) => {
+    saveUserActions();
+    //console.log('WRITE:', userActionsList.slice(0, 10));
+  });
 
   // Add event listener for when Chrome loses focus
   window.addEventListener("blur", function (event) {
     handleEvent("chromeLostFocus", event);
   });
 
-  // Add event listener for when Chrome gains focus
-  window.addEventListener("focus", function (event) {
-    handleEvent("chromeGainedFocus", event);
-  });
+  // // Add event listener for when Chrome gains focus
+  // window.addEventListener("focus", function (event) {
+  //   handleEvent("chromeGainedFocus", event);
+  // });
 
-  // Add event listeners for the user events
-  userEventsToTrack.forEach((eventType) => {
-    window.addEventListener(eventType, (event) => handleEvent(eventType, event));
-
-    if (eventType === "popstate" || eventType === "beforeunload") {
-      window.addEventListener(eventType, (event) => {
-        handleEvent("navigation", event);
-      });
-    }
-  });
+  /* NEW or UPDATED ENDS *********************************/
 
   // Create a custom bottom div for logging
   const customBottomDiv = document.createElement("div");
@@ -498,10 +482,5 @@ function sendMessageToInjectedScript(eventName, data) {
     customBottomDiv.style.display = event.detail ? "block" : "none";
   });
 
-  window.addEventListener('beforeunload', (event) => {
-
-    saveUserActions
-    //console.log('WRITE:', userActionsList.slice(0, 10));
-  });
 
 })();
