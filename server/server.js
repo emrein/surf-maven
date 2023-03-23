@@ -135,15 +135,45 @@ app.post('/add-userlog', (req, res) => {
 }
 );
 
-app.get("/userlog-last10", (req, res) => {
-  log_start('userlog-last10');
-  db.all("SELECT * FROM userlogs ORDER BY creation_date desc;", (err, rows) => {
+app.get("/userlog-last/:rowcount", (req, res) => {
+  log_start('userlog-last');
+
+  // extract the row count limit from the URL parameter
+  const rowcount = parseInt(req.params.rowcount);
+
+  // construct the SQL query using the row count limit
+  const query = `SELECT * FROM userlogs ORDER BY creation_date DESC LIMIT ${rowcount}`;
+
+  // execute the query using the database connection
+  db.all(query, (err, rows) => {
     if (err) {
       console.error(err.message);
+      res.status(500).send('Internal Server Error');
+      return;
     }
-    res.json(JSON.stringify(rows));
-    log_end('userlog-last10');
+    res.json(rows);
+    log_end('userlog-last');
   });
+});
 
+app.get("/userlog-top/:rowcount", (req, res) => {
+  log_start('userlog-top');
+
+  // extract the row count limit from the URL parameter
+  const rowcount = parseInt(req.params.rowcount);
+
+  // construct the SQL query using the row count limit
+  const query = `select definition_name, count(*) count from userlogs group by definition_name order by count desc limit ${rowcount}`;
+
+  // execute the query using the database connection
+  db.all(query, (err, rows) => {
+    if (err) {
+      console.error(err.message);
+      res.status(500).send('Internal Server Error');
+      return;
+    }
+    res.json(rows);
+    log_end('userlog-top');
+  });
 });
 

@@ -8,14 +8,6 @@ class PageData {
   }
 }
 
-let bhList = [
-  { id: 1, name: "Behavior 1", acode: 'A1', xml:null, json:null },
-  { id: 2, name: "Behavior 2", acode: 'A2', xml:null, json:null },
-  { id: 3, name: "Behavior 3", acode: 'A3', xml:null, json:null },
-  { id: 4, name: "Behavior 4", acode: 'A4', xml:null, json:null },
-  { id: 5, name: "Behavior 5", acode: 'A5', xml:null, json:null }
-];
-
 function BehaviorSelect({ show, onHide, onSelect }) {
   const [selectedId, setSelectedId] = useState(null);
 
@@ -34,8 +26,6 @@ function BehaviorSelect({ show, onHide, onSelect }) {
         let obj = jsonData[i];
         pd.behavioursList.push({ id: obj.id, name: obj.definition_name, acode: obj.access_code, xml:obj.xml_definition, json:obj.json_definition },);
       }
-
-
       setData(pd);
     };
     fetchData();
