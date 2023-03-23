@@ -5,7 +5,7 @@ import { Box, Grid } from '@mui/material';
 import { Typography } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { API_URL } from "./config.js"
-import 'chartjs-plugin-datalabels';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 
 const chart_category_count = 3;
 
@@ -186,6 +186,29 @@ const Dashboard = () => {
     },
   });
 
+  const pieChartOptions = {
+    plugins: {
+      datalabels: {
+        color: '#000', // Change the color of the text
+        formatter: (value, context) => {
+          let sum = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+          let percentage = (value * 100 / sum).toFixed(2) + '%';
+          return value + ' (' + percentage + ')';
+        },
+        font: {
+          size: 14, // Set the font size
+        },
+      },
+    },
+    legend: {
+      labels: {
+        fontFamily: 'Arial', // Specify the font family here
+        fontSize: 12, // Specify the font size here
+        fontStyle: 'italic', // Specify the font style here
+      },
+    },
+  };
+
   return (
     <ThemeProvider theme={customTheme}>
       <Grid container padding={5}>
@@ -214,7 +237,7 @@ const Dashboard = () => {
             </Typography>
           </Box>
           <Box height="100%" display="flex" justifyContent="center" alignItems="top" p={4} padding={10} >
-            <Pie data={chartData} />
+            <Pie data={chartData} options={pieChartOptions} plugins={[ChartDataLabels]} />
           </Box>
         </Grid>
 
